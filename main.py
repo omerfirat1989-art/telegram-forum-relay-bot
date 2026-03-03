@@ -3,9 +3,9 @@ import sqlite3
 import logging
 import asyncio
 
-from aiogram.filters import Command
+from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, Command
 
 logging.basicConfig(level=logging.INFO)
 
@@ -13,8 +13,8 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 FORUM_CHAT_ID = int(os.getenv("ADMIN_FORUM_CHAT_ID", "0"))
 
-if not BOT_TOKEN or not ADMIN_ID or not FORUM_CHAT_ID:
-    raise RuntimeError("BOT_TOKEN / ADMIN_ID / ADMIN_FORUM_CHAT_ID eksik.")
+if not BOT_TOKEN or not ADMIN_ID:
+    raise RuntimeError("BOT_TOKEN / ADMIN_ID eksik.")
 
 DB_PATH = "relay.db"
 
@@ -64,7 +64,7 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 WELCOME_TEXT = (
-    "👋 Merhaba, size her türlü destek sağlayabilirim.\n\n"
+   "👋 Merhaba, size her türlü destek sağlayabilirim.\n\n"
     "📌 İsim Soyisim'den Tc NO, Telefon, Aile TC VE İKAMETGAH\n"
     "📌 Plakadan Şahıs , Numara, Adres, Araç Bilgileri.\n"
     "📌 Kişiden , Araç Bilgileri..\n"
@@ -85,7 +85,17 @@ AUTO_REPLY_TEXT = (
     "En kısa sürede size dönüş yapılacak."
 )
 
+# ✅ Panel grubunda /panelid yazınca chat id verir (sadece admin)
+@dp.message(Command("panelid"))
+async def panelid(message: Message):
+    if message.from_user.id != ADMIN_ID:
+        return
+    await message.answer(f"CHAT ID: {message.chat.id}\nTHREAD ID: {message.message_thread_id}")
+
 async def ensure_topic_for_user(user_id: int, user_name: str) -> int:
+    if not FORUM_CHAT_ID:
+        raise RuntimeError("ADMIN_FORUM_CHAT_ID eksik. Panel grubunda /panelid ile chat id al.")
+
     topic_id = db_get_topic(user_id)
     if topic_id:
         return topic_id
@@ -124,13 +134,10 @@ async def user_any_message(message: Message):
     await message.answer(AUTO_REPLY_TEXT)
     await send_user_message_to_topic(message)
 
-@dp.message(F.chat.id == FORUM_CHAT_ID)
+@dp.message(FORUM_CHAT_ID != 0, F.chat.id == FORUM_CHAT_ID)
 async def admin_from_forum(message: Message):
     if message.from_user.id != ADMIN_ID:
         return
-@dp.message(Command("panelid"))
-async def get_panel_id(message: Message):
-    await message.answer(f"CHAT ID: {message.chat.id}")
 
     topic_id = message.message_thread_id
     if not topic_id:
