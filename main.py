@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO)
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
-FORUM_CHAT_ID = int(os.getenv("ADMIN_FORUM_CHAT_ID", "0"))
+FORUM_CHAT_ID = int(os.getenv("ADMIN_FORUM_CHAT_ID", "0"))  # -100... panel grup id (sonradan doğru yapacağız)
 
 if not BOT_TOKEN or not ADMIN_ID:
     raise RuntimeError("BOT_TOKEN / ADMIN_ID eksik.")
@@ -64,7 +64,7 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 WELCOME_TEXT = (
-   "👋 Merhaba, size her türlü destek sağlayabilirim.\n\n"
+    "👋 Merhaba, size her türlü destek sağlayabilirim.\n\n"
     "📌 İsim Soyisim'den Tc NO, Telefon, Aile TC VE İKAMETGAH\n"
     "📌 Plakadan Şahıs , Numara, Adres, Araç Bilgileri.\n"
     "📌 Kişiden , Araç Bilgileri..\n"
@@ -85,7 +85,7 @@ AUTO_REPLY_TEXT = (
     "En kısa sürede size dönüş yapılacak."
 )
 
-# ✅ Panel grubunda /panelid yazınca chat id verir (sadece admin)
+# ✅ Panel grubunda yaz: /panelid  -> sana chat id + thread id döner (sadece admin)
 @dp.message(Command("panelid"))
 async def panelid(message: Message):
     if message.from_user.id != ADMIN_ID:
@@ -93,8 +93,8 @@ async def panelid(message: Message):
     await message.answer(f"CHAT ID: {message.chat.id}\nTHREAD ID: {message.message_thread_id}")
 
 async def ensure_topic_for_user(user_id: int, user_name: str) -> int:
-    if not FORUM_CHAT_ID:
-        raise RuntimeError("ADMIN_FORUM_CHAT_ID eksik. Panel grubunda /panelid ile chat id al.")
+    if FORUM_CHAT_ID == 0:
+        raise RuntimeError("ADMIN_FORUM_CHAT_ID yok/yanlış. Panel grubunda /panelid ile doğru ID'yi al.")
 
     topic_id = db_get_topic(user_id)
     if topic_id:
@@ -124,19 +124,26 @@ async def send_user_message_to_topic(message: Message):
         message_id=message.message_id
     )
 
+# Kullanıcı /start
 @dp.message(CommandStart(), F.from_user.id != ADMIN_ID)
 async def start_handler(message: Message):
     await message.answer(WELCOME_TEXT)
     await send_user_message_to_topic(message)
 
+# Kullanıcı diğer mesajlar
 @dp.message(F.from_user.id != ADMIN_ID)
 async def user_any_message(message: Message):
     await message.answer(AUTO_REPLY_TEXT)
     await send_user_message_to_topic(message)
 
-@dp.message(FORUM_CHAT_ID != 0, F.chat.id == FORUM_CHAT_ID)
+# Admin panel grubunda konu içinde yazınca -> kullanıcıya gönder
+@dp.message()
 async def admin_from_forum(message: Message):
     if message.from_user.id != ADMIN_ID:
+        return
+    if FORUM_CHAT_ID == 0:
+        return
+    if message.chat.id != FORUM_CHAT_ID:
         return
 
     topic_id = message.message_thread_id
