@@ -3,7 +3,7 @@ import sqlite3
 import logging
 import asyncio
 
-from aiogram import Bot, Dispatcher, F
+from aiogram.filters import Command
 from aiogram.types import Message
 from aiogram.filters import CommandStart
 
@@ -128,6 +128,9 @@ async def user_any_message(message: Message):
 async def admin_from_forum(message: Message):
     if message.from_user.id != ADMIN_ID:
         return
+@dp.message(Command("panelid"))
+async def get_panel_id(message: Message):
+    await message.answer(f"CHAT ID: {message.chat.id}")
 
     topic_id = message.message_thread_id
     if not topic_id:
